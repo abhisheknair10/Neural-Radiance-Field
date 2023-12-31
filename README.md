@@ -1,1 +1,1 @@
-# NeRF.Neural-Radiance-Field
+# Neural-Radiance-Field
