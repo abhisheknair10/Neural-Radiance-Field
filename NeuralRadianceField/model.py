@@ -4,19 +4,18 @@ import torch.nn.functional as F
 
 
 class NeRFModel(nn.Module):
-    def __init__(self, num_hidden_layers=8, hidden_layer_size=256, rgb_channels=3, sigma_channels=1):
+    def __init__(self, num_hidden_layers=8, hidden_layer_size=256, in_channels=5):
         super(NeRFModel, self).__init__()
 
-        self.rgb_channels = rgb_channels
-        self.sigma_channels = sigma_channels
+        self.in_channels = in_channels
 
-        self.input_layer = nn.Linear(5, hidden_layer_size)
+        self.input_layer = nn.Linear(in_channels, hidden_layer_size)
 
         self.hidden_layers = nn.ModuleList(
             [nn.Linear(hidden_layer_size, hidden_layer_size) for _ in range(num_hidden_layers)]
         )
 
-        self.output_layer = nn.Linear(hidden_layer_size, rgb_channels + sigma_channels)
+        self.output_layer = nn.Linear(hidden_layer_size, 4)
 
     def forward(self, x):
         """
@@ -35,6 +34,7 @@ class NeRFModel(nn.Module):
         x = self.output_layer(x)
 
         # x (shape): (ray_samples, 4)
-        rgb, sigma = torch.split(x, [self.rgb_channels, self.sigma_channels], dim=-1)
+        rgb = torch.sigmoid(x[..., :3])
+        sigma = torch.relu(x[..., -1])
 
         return rgb, sigma

@@ -52,7 +52,7 @@ def compute_rays(height, width, intrinsics, tform_cam2world, device='cpu'):
     # camera_coords: (3, height, width)
     camera_coords = torch.matmul(
         torch.inverse(intrinsics), 
-        pixel_coords.permute(2, 0, 1).reshape(3, height * width)
+        pixel_coords.permute(2, 0, 1).reshape(3, -1)
     ).reshape(3, height, width)
 
     # calculate ray directions
@@ -61,7 +61,7 @@ def compute_rays(height, width, intrinsics, tform_cam2world, device='cpu'):
         tform_cam2world[:3, :3],
         camera_coords.reshape(3, -1)
     ).reshape(3, height, width).permute(1, 2, 0)
-
+    
     # calculate ray origins
     # ray_origin: (height, width, 3)
     ray_origin = tform_cam2world[:3, 3].view(1, 1, 3).expand(height, width, 3)
@@ -130,7 +130,7 @@ def positional_encoding(tensor, num_encoding_functions=1, include_input=True):
         output.append(tensor)
 
     for i in range(0, num_encoding_functions):
-        l_scaled = tensor * (1 << i)
+        l_scaled = tensor * (2.0 ** i)
 
         sin_enc = torch.sin(l_scaled)
         cos_enc = torch.cos(l_scaled)
@@ -139,7 +139,7 @@ def positional_encoding(tensor, num_encoding_functions=1, include_input=True):
         output.append(fin_enc)
 
     # positionally encoded samples
-    # output: (num_samples, 2 * num_encoding_functions + (3 or 0))
+    # output: (num_samples, (3 * 2 * num_encoding_functions) + (3 or 0))
     return torch.cat(output, dim=-1)
 
 
@@ -163,16 +163,47 @@ def compute_weights(sigma, depth, device='cpu'):
 
     # calculate delta, the difference in depth values
     # delta: (num_samples)
-    delta = depth[1:] - depth[:-1]
-
+    delta = torch.cat([
+        depth[..., 1:] - depth[..., :-1], 
+        torch.tensor([1e10], device=device).expand(depth[..., -1].unsqueeze(-1).shape)
+    ], dim=-1)
+    
     # calculate accumulated transmittance
     # accumulated_transmittance: (num_samples)
-    accumulated_transmittance = torch.exp(-torch.cumprod(sigma * delta, dim=0))
+    accumulated_transmittance = torch.exp(-torch.cumprod(sigma * delta, dim=-1))
 
     # calculate normalized weights
     # weights: (num_samples)
     weights = accumulated_transmittance * (1 - torch.exp(-sigma * delta))
-    weights = torch.cat([weights, torch.ones_like(weights[:1])], dim=0)
-    weights = weights / torch.sum(weights)
 
     return weights
+
+
+def compute_ray_properties(rgb_samples, sigma_samples, depth, device='cpu'):
+    """
+    Description:
+        Compute the pixel color by performing the volume rendering integral. This is done by
+        calculating the weighted sum of the RGB values at each sample point along the ray.
+    Args:
+        rgb_samples: (torch.Tensor) RGB values at each sample point along the ray
+        sigma_samples: (torch.Tensor) volume density values at each sample point along the ray
+        depth: (torch.Tensor) sampled depth values along the ray
+        device: (str) device to use (default: 'cpu')
+    Returns:
+        color: (torch.Tensor) pixel color
+        depth: (torch.Tensor) pixel depth
+    """
+
+    # compute weights
+    # weights: (num_samples)
+    weights = compute_weights(sigma_samples, depth).to(device)
+
+    # calculate pixel color
+    # color: (3)
+    color = torch.sum(weights.unsqueeze(-1) * rgb_samples, dim=2)
+
+    # calculate pixel depth
+    # depth: (1)
+    depth = torch.sum(weights * depth, dim=2)
+
+    return color, depth
