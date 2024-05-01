@@ -1,5 +1,4 @@
 from itertools import accumulate
-from re import I
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -38,11 +37,6 @@ def compute_rays(height, width, intrinsics, tform_cam2world, device='cpu'):
         torch.arange(width),
         indexing='ij'
     )
-
-    # normalize pixel coordinates
-    # y: (height, width), x: (height, width)
-    y = y.float() / height
-    x = x.float() / width
 
     # pixel coordinates
     # pixel_coords: (height, width, 3)
@@ -105,7 +99,7 @@ def sample_ray(ray_dir, ray_origin, near, far, num_samples, device='cpu'):
 
     # calculate 3d points along the ray
     # samples: (num_samples, 3)
-    samples = ray_origin + depth.unsqueeze(-1) * ray_dir
+    samples = ray_origin + ray_dir * depth.unsqueeze(-1)
 
     return samples, depth
 
@@ -165,14 +159,17 @@ def compute_weights(sigma, depth, device='cpu'):
     # delta: (num_samples)
     delta = torch.cat([
         depth[..., 1:] - depth[..., :-1], 
-        torch.tensor([1e10], device=device).expand(depth[..., -1].unsqueeze(-1).shape)
+        torch.tensor([1e9], device=device).expand(depth[..., -1].unsqueeze(-1).shape)
     ], dim=-1)
-    
+
     # calculate accumulated transmittance
     # accumulated_transmittance: (num_samples)
-    accumulated_transmittance = torch.exp(-torch.cumprod(sigma * delta, dim=-1))
+    accumulated_transmittance = torch.cat([
+        torch.ones_like(sigma[..., :1]), 
+        torch.cumprod(torch.exp(-sigma * delta), dim=-1)[..., :-1]
+    ], dim=-1)
 
-    # calculate normalized weights
+    # calculate weights
     # weights: (num_samples)
     weights = accumulated_transmittance * (1 - torch.exp(-sigma * delta))
 

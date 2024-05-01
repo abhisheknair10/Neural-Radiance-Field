@@ -30,15 +30,12 @@ def train():
     intrinsics, images, poses = load_data()
 
     # set parameters
-    device = 'mps'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     img_height, img_width = images[0].shape[:2]
 
     # initialize NeRF model
-    model = NeRFModel(num_hidden_layers=8, hidden_layer_size=256, in_channels=51).to(device)
+    model = NeRFModel(num_hidden_layers=6, hidden_layer_size=256, in_channels=51).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=5e-4)
-
-    images = images[:5]
-    poses = poses[:5]
 
     intrinsics, images, poses = intrinsics.to(device), images.to(device), poses.to(device)
 
@@ -84,16 +81,21 @@ def train():
             loss.backward()
             optimizer.step()
 
-            # save images
-            # plt.imsave(f'results/{epoch}_{i}_color.png', color.cpu().detach().numpy())
-
             # plot image
             if i % 10 == 0:
-                plt.imshow(color.cpu().detach().numpy())
-                # plt.imshow(images[i].cpu().detach().numpy())
-                plt.show()
+                fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+                
+                axes[0].imshow(color.cpu().detach().numpy())
+                axes[0].set_title('Predicted Image')
+                
+                axes[1].imshow(images[i].cpu().detach().numpy())
+                axes[1].set_title('Image')
+                
+                axes[2].imshow(depth.cpu().detach().numpy())
+                axes[2].set_title('Depth')
 
-            print(f'Epoch: {epoch}, Image: {i}, Loss: {loss.item()}')
+                plt.title(f'Epoch: {epoch}, Image: {i}')
+                plt.show()
 
 
 if __name__ == '__main__':

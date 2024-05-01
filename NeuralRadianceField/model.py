@@ -27,14 +27,16 @@ class NeRFModel(nn.Module):
         """
         
         x = F.relu(self.input_layer(x))
+        mi = x
 
         for layer in self.hidden_layers:
             x = F.relu(layer(x))
 
-        x = self.output_layer(x)
+        # with skip connection
+        x = self.output_layer(x + mi)
 
         # x (shape): (ray_samples, 4)
         rgb = torch.sigmoid(x[..., :3])
-        sigma = torch.relu(x[..., -1])
+        sigma = torch.relu(x[..., 3])
 
         return rgb, sigma
