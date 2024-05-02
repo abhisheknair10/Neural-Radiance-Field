@@ -1,4 +1,4 @@
-# Neural Radiance Field NeRF)
+# Neural Radiance Field NeRF
 
 Neural Radiance Field or NeRF is a technique to represent a scene in the form of a network of encoded information. In theory, it takes a series of images taken from different positions and perspectives of an object, and from a learned function, is able to produce novel views of the object. This technique was first introduced in the paper [NeRF: Representing Scenes as Neural Radiance Field for View Synthesis](https://arxiv.org/abs/2003.08934) by Ben Mildenhall et al. in 2020.
 
@@ -6,7 +6,7 @@ This repository is an implementation of the ideas and techniques presented in th
 
 ## Intuition - Understanding the Paper
 
-The abstract of the NeRF paper outlines the core concept of representing a scene using a deep fully connected neural network. The approach involves creating an encoded representation of a scene by training a deep neural network on a sparse set of images captured from various perspectives. Each image in the dataset is associated with known camera extrinsic and intrinsic parameters, enabling the implicit calculation of 3D points in space where rays intersect with objects in the scene before reaching the camera.
+The abstract of the NeRF paper outlines the core concept of representing a scene using a deep fully connected neural network. The approach involves creating an encoded representation of a scene by training a deep neural network on a sparse set of images captured from various perspectives. Each image in the dataset is associated with known camera extrinsic and intrinsic parameters, enabling the explicit calculation of color and density properties of 3D points on light rays passing through the scene.
 
 <p align="center">
   <img src="Assets/nerf-main.png" width="600">
@@ -29,3 +29,5 @@ By batching up different positions along a straight line along a viewing directi
 <p align="center">
   <img src="Assets/ray-plot.png" width="600">
 </p>
+
+We integrate the color and density properties along the ray, essentially calculating the weighted sum of the color and density values at each point along the ray, yielding the final color of the ray corresponding to the pixel in the image.
